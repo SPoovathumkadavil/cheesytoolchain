@@ -16,6 +16,6 @@
 void kernel_main(void)
 {
     /* Initialize terminal interface */
-    terminal_initialize();
-    terminal_writestring("\n\n\n\n\nHello, kernel World!\n");
+    terminal::initialize();
+    terminal::write_string("hello\n\n\n\n\nhello");
 }
