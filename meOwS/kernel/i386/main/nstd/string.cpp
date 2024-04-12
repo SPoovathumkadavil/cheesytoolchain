@@ -1,10 +1,7 @@
 
 #include "nstd/string.h"
 
-size_t strlen(const char* str)
+namespace nstd
 {
-	size_t len = 0;
-	while (str[len])
-		len++;
-	return len;
+
 }
