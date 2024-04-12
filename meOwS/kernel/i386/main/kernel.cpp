@@ -16,6 +16,6 @@
 void kernel_main(void)
 {
     /* Initialize terminal interface */
-    terminal::initialize();
-    terminal::write_string("hello\n\n\n\n\nhello");
+    system::terminal::initialize();
+    system::terminal::print_splash();
 }

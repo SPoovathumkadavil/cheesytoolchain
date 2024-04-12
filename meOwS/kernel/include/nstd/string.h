@@ -4,6 +4,14 @@
 
 #include <stddef.h>
 
-size_t strlen(const char* str);
+namespace nstd {
+    [[maybe_unused]] static size_t strlen(const char *str)
+    {
+		size_t len = 0;
+		while (str[len])
+			len++;
+		return len;
+	}
+}
 
-#endif // _STRING_H_
+#endif
