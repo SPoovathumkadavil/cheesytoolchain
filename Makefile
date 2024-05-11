@@ -2,35 +2,66 @@ MAKEFLAGS=-s
 
 MAKEFILE_DIR:=$(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
+# ------------
+# Dependencies
+# ------------
+
+install_dependencies: remove_cross_compiler all_utility all_cross_compiler
+
 # --------------
 # Cross-Compiler
 # --------------
 
-CROSS_COMPILER_DIR=$(MAKEFILE_DIR)/crosscompiler
+CROSS_COMPILER_DIR=$(MAKEFILE_DIR)/environment
 
 PREFIX=$(CROSS_COMPILER_DIR)/compiler
 TARGET=x86_64-elf
-export PATH := $(PREFIX):$(PATH)
+export PATH := $(PREFIX)/bin:$(PATH)
 
 begin_cross_compiler:
-	echo "Creating Cross-Compiler"
-	rm -rf $(CROSS_COMPILER_DIR)
+	echo $(PATH)
+	figlet "Creating Cross-Compiler"
 	mkdir -p $(CROSS_COMPILER_DIR)
 
-clean_cross_compiler: clean_binutils_build clean_gdb_build clean_gcc_build
+strip_cross_compiler: clean_binutils_build clean_gdb_build clean_gcc_build clean_gmp_build clean_mpfr_build clean_mpc_build clean_autoconf_build clean_automake_build clean_texinfo_build clean_libtool_build
+	echo "Removing Source Files..."
+	echo "(1) Binutils"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_BINUTILS)
+	echo "(2) GDB"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_GDB)
+	echo "(3) GCC"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_GCC)
+	echo "(4) GMP"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_GMP)
+	echo "(5) MPFR"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_MPFR)
+	echo "(6) MPC"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_MPC)
+	echo "(7) autoconf"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_AUTOCONF)
+	echo "(8) automake"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_AUTOMAKE)
+	echo "(9) libtool"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_LIBTOOL)
+	echo "(10) texinfo"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_TEXINFO)
 
-all_cross_compiler: begin_cross_compiler download_binutils download_gcc download_gdb build_binutils build_gcc build_gdb clean_cross_compiler
+
+all_cross_compiler: begin_cross_compiler install_m4 install_autoconf install_automake install_libtool install_gmp install_mpfr install_mpc install_texinfo install_binutils install_gdb install_gcc
 	echo "Cross-Compiler Created (probably) !"
+
 remove_cross_compiler:
 	echo "Removing Cross-Compiler..."
 	rm -rf $(CROSS_COMPILER_DIR)
 
 # Binutils
 
+install_binutils: download_binutils build_binutils
+
 SOURCE_BINUTILS=binutils-2.42
 
 download_binutils:
-	echo "Downloading Binutils"
+	figlet "Downloading Binutils"
 	curl -s "https://ftp.gnu.org/gnu/binutils/$(SOURCE_BINUTILS).tar.bz2" | tar xvjf - -C $(CROSS_COMPILER_DIR)
 
 build_binutils:
@@ -43,9 +74,9 @@ build_binutils:
 			--with-sysroot \
 			--disable-nls \
 			--disable-werror \
-		&& make \
+		&& make -j 8 \
 		&& make install
-	echo "Binutils (probably) Built Successfully!"
+	echo "Binutils (probably) Built Successfully !"
 
 clean_binutils_build:
 	echo "Purging Binutils Build Files"
@@ -53,10 +84,12 @@ clean_binutils_build:
 
 # GDB
 
+install_gdb: download_gdb build_gdb
+
 SOURCE_GDB=gdb-14.2
 
 download_gdb:
-	echo "Downloading GDB"
+	figlet "Downloading GDB"
 	curl -s "https://ftp.gnu.org/gnu/gdb/$(SOURCE_GDB).tar.gz" | tar xvfz - -C $(CROSS_COMPILER_DIR)
 
 build_gdb:
@@ -66,10 +99,11 @@ build_gdb:
 		&& $(CROSS_COMPILER_DIR)/$(SOURCE_GDB)/configure \
 			--target=$(TARGET) \
 			--prefix=$(PREFIX) \
+			--with-gmp=$(PREFIX) \
 			--disable-werror \
-		&& make all-gdb \
+		&& make -j 8 all-gdb \
 		&& make install-gdb
-	echo "GDB (probably) Built Successfully!"
+	echo "GDB (probably) Built Successfully !"
 
 clean_gdb_build:
 	echo "Purging GDB Build Files"
@@ -77,11 +111,13 @@ clean_gdb_build:
 
 # GCC
 
+install_gcc: download_gcc build_gcc
+
 SOURCE_GCC=gcc-14.1.0
 TARGET_AS_LOCATION=$(wildcard $(PREFIX)/bin/$(TARGET)-as)
 
 download_gcc:
-	echo "Downloading GCC"
+	figlet "Downloading GCC"
 	curl "https://ftp.gnu.org/gnu/gcc/gcc-14.1.0/$(SOURCE_GCC).tar.gz" | tar xvfz - -C $(CROSS_COMPILER_DIR)
 
 build_gcc:
@@ -95,11 +131,13 @@ ifneq ($(TARGET_AS_LOCATION) , )
 			--disable-nls \
 			--enable-languages=c,c++ \
 			--without-headers \
-		&& make all-gcc \
+			--with-gmp=$(PREFIX) \
+			--with-mpc=$(PREFIX) \
+		&& make -j 8 all-gcc \
 		&& make all-target-libgcc \
 		&& make install-gcc \
 		&& make install-target-libgcc
-	echo "GCC (probably) Built Successfully!"
+	echo "GCC (probably) Built Successfully !"
 else
 	echo "Install Binutils before attempting to build GCC"
 endif
@@ -108,9 +146,221 @@ clean_gcc_build:
 	echo "Purging GCC Build Files"
 	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_GCC)
 
+# m4 (Needed For GMP)
+
+install_m4: download_m4 build_m4
+
+SOURCE_M4=m4-1.4.19
+
+download_m4:
+	figlet "Downloading m4"
+	curl "https://ftp.gnu.org/gnu/m4/$(SOURCE_M4).tar.bz2" | tar xvjf - -C $(CROSS_COMPILER_DIR)
+
+build_m4:
+	echo "Building m4"
+	mkdir -p $(CROSS_COMPILER_DIR)/build-$(SOURCE_M4)
+	cd $(CROSS_COMPILER_DIR)/build-$(SOURCE_M4) \
+		&& $(CROSS_COMPILER_DIR)/$(SOURCE_M4)/configure \
+			--prefix=$(PREFIX) \
+			--disable-dependency-tracking \
+		&& make -j8 \
+		&& make install
+	echo "m4 (probably) Built Successfully !"
+
+clean_m4_build:
+	echo "Purging m4 Build Files"
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_M4)
+
+# GMP (Needed For GCC)
+
+install_gmp: download_gmp build_gmp
+
+SOURCE_GMP=gmp-6.3.0
+
+download_gmp:
+	figlet "Downloading GMP"
+	curl "https://ftp.gnu.org/gnu/gmp/$(SOURCE_GMP).tar.bz2" | tar xvjf - -C $(CROSS_COMPILER_DIR)
+
+build_gmp:
+	echo "Building GMP"
+	mkdir -p $(CROSS_COMPILER_DIR)/build-$(SOURCE_GMP)
+	cd $(CROSS_COMPILER_DIR)/build-$(SOURCE_GMP) \
+		&& $(CROSS_COMPILER_DIR)/$(SOURCE_GMP)/configure \
+			--prefix=$(PREFIX) \
+		&& make -j 8 \
+		&& make install \
+		&& make check
+	echo "GMP (probably) Built Successfully !"
+
+clean_gmp_build:
+	echo "Purging GMP Build Files"
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_GMP)
+
+# MPFR (Needed For GCC)
+
+install_mpfr: download_mpfr build_mpfr
+
+SOURCE_MPFR=mpfr-4.2.1
+
+download_mpfr:
+	figlet "Downloading MPFR"
+	curl "https://ftp.gnu.org/gnu/mpfr/$(SOURCE_MPFR).tar.bz2" | tar xvjf - -C $(CROSS_COMPILER_DIR)
+
+build_mpfr:
+	echo "Building MPFR"
+	mkdir -p $(CROSS_COMPILER_DIR)/build-$(SOURCE_MPFR)
+	cd $(CROSS_COMPILER_DIR)/build-$(SOURCE_MPFR) \
+		&& $(CROSS_COMPILER_DIR)/$(SOURCE_MPFR)/configure \
+			--prefix=$(PREFIX) \
+			--disable-dependency-tracking \
+			--disable-debug \
+			--libdir=$(PREFIX)/lib \
+			--with-gmp-include=$(PREFIX)/include/ \
+			--with-gmp-lib=$(PREFIX)/lib \
+			--disable-silent-rules \
+		&& make -j8 \
+		&& make check \
+		&& make install
+	echo "MPFR (probably) Built Successfully !"
+
+clean_mpfr_build:
+	echo "Purging MPFR Build Files"
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_MPFR)
+
+# MPC
+
+install_mpc: download_mpc build_mpc
+
+SOURCE_MPC=mpc-1.3.1
+
+download_mpc:
+	figlet "Downloading MPC"
+	curl "https://ftp.gnu.org/gnu/mpc/$(SOURCE_MPC).tar.gz" | tar xvfz - -C $(CROSS_COMPILER_DIR)
+
+build_mpc:
+	echo "Building MPC"
+	mkdir -p $(CROSS_COMPILER_DIR)/build-$(SOURCE_MPC)
+	cd $(CROSS_COMPILER_DIR)/build-$(SOURCE_MPC) \
+		&& $(CROSS_COMPILER_DIR)/$(SOURCE_MPC)/configure \
+			--prefix=$(PREFIX) \
+			--with-gmp=$(PREFIX) \
+		&& make -j 8 \
+		&& make install
+	echo "MPC (probably) Built Successfully !"
+
+clean_mpc_build:
+	echo "Purging MPC Build Files"
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_MPC)
+
+# libtool (dep. m4)
+
+install_libtool: download_libtool build_libtool
+
+SOURCE_LIBTOOL=libtool-2.4
+
+download_libtool:
+	figlet "Downloading libtool"
+	curl "https://ftp.gnu.org/gnu/libtool/$(SOURCE_LIBTOOL).tar.gz" | tar xvfz - -C $(CROSS_COMPILER_DIR)
+
+build_libtool:
+	echo "Building libtool"
+	mkdir -p $(CROSS_COMPILER_DIR)/build-$(SOURCE_LIBTOOL)
+	cd $(CROSS_COMPILER_DIR)/build-$(SOURCE_LIBTOOL) \
+		&& $(CROSS_COMPILER_DIR)/$(SOURCE_LIBTOOL)/configure \
+			--disable-dependency-tracking \
+			--prefix=$(PREFIX) \
+			--enable-ltdl-install \
+		&& make -j8 \
+		&& make install
+	echo "libtool (probably) Build Successfully !"
+
+clean_libtool_build:
+	echo "Purging libtool Build Files"
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_LIBTOOL)
+
+# autoconf (dep. m4, perl)
+
+install_autoconf: download_autoconf build_autoconf
+
+SOURCE_AUTOCONF=autoconf-2.72
+
+download_autoconf:
+	figlet "Downloading autoconf"
+	curl "https://ftp.gnu.org/gnu/autoconf/$(SOURCE_AUTOCONF).tar.gz" | tar xvfz - -C $(CROSS_COMPILER_DIR)
+
+build_autoconf:
+	echo "Building autoconf"
+	mkdir -p $(CROSS_COMPILER_DIR)/build-$(SOURCE_AUTOCONF)
+	cd $(CROSS_COMPILER_DIR)/build-$(SOURCE_AUTOCONF) \
+		&& $(CROSS_COMPILER_DIR)/$(SOURCE_AUTOCONF)/configure \
+			--prefix=$(PREFIX) \
+		&& make install
+	echo "autoconf (probably) Built Successfully !"
+
+clean_autoconf_build:
+	echo "Purging autoconf Build"
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_LIBTOOL)
+
+# automake (dep. autoconf)
+
+install_automake: download_automake build_automake
+
+SOURCE_AUTOMAKE=automake-1.16.5
+
+download_automake:
+	figlet "Downloading automake"
+	curl "https://ftp.gnu.org/gnu/automake/$(SOURCE_AUTOMAKE).tar.xz" | tar xvJf - -C $(CROSS_COMPILER_DIR)
+
+build_automake:
+	echo "Building automake"
+	mkdir -p $(CROSS_COMPILER_DIR)/build-$(SOURCE_AUTOMAKE)
+	cd $(CROSS_COMPILER_DIR)/build-$(SOURCE_AUTOMAKE) \
+		&& $(CROSS_COMPILER_DIR)/$(SOURCE_AUTOMAKE)/configure \
+			--prefix=$(PREFIX) \
+		&& make install
+	echo "automake (probably) Built Successfully !"
+
+clean_automake_build:
+	echo "Purging automake Build Files"
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_AUTOMAKE)
+
+# texinfo
+
+install_texinfo: download_texinfo build_texinfo
+
+SOURCE_TEXINFO=texinfo-7.1
+
+download_texinfo:
+	figlet "Downloading texinfo"
+	curl "https://ftp.gnu.org/gnu/texinfo/$(SOURCE_TEXINFO).tar.xz" | tar xvJf - -C $(CROSS_COMPILER_DIR)
+
+build_texinfo:
+	echo "Building texinfo"
+	mkdir -p $(CROSS_COMPILER_DIR)/build-$(SOURCE_TEXINFO)
+	cd $(CROSS_COMPILER_DIR)/build-$(SOURCE_TEXINFO) \
+		&& $(CROSS_COMPILER_DIR)/$(SOURCE_TEXINFO)/configure \
+			--prefix=$(PREFIX) \
+		&& make -j 8 \
+		&& make check \
+		&& make install
+	echo "texinfo (probably) Built Successfully !"
+
+clean_texinfo_build:
+	echo "Purging texinfo Build Files"
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_TEXINFO)
+
 # -------
 # Utility
 # -------
+
+UTILITY_DIR := $(CROSS_COMPILER_DIR)/utility
+export PATH := $(UTILITY_DIR)/bin:$(PATH)
+
+begin_utility:
+	echo "Making Utility"
+	mkdir -p $(UTILITY_DIR)
+
+all_utility: begin_utility install_figlet
 
 list:
 	echo "usage: make [any target]"
@@ -120,17 +370,63 @@ list:
 	echo "                          then clean build files."
 	echo "clean_cross_compiler ---> Remove all build files from Binutils, GDB, GCC"
 	echo "download_binutils    ---> Downloads and Extracts binutils"
-	echo "build_binutils_build ---> Builds downloaded binutils and installs binaries"
+	echo "build_binutils       ---> Builds downloaded binutils and installs binaries"
 	echo "                          into main compiler directory"
 	echo "clean_binutils       ---> Removes build directory (from the build step)"
+	echo "install_binutils     ---> Install Binutils (follow order)"
 	echo "download_gcc         ---> Downloads and Extracts gcc"
-	echo "build_gcc_build      ---> Builds downloaded gcc and installs binaries"
+	echo "build_gcc            ---> Builds downloaded gcc and installs binaries"
 	echo "                          into main compiler directory (binutils required)"
-	echo "clean_gcc            ---> Removes build directory (from the build step)"
+	echo "clean_gcc_build      ---> Removes build directory (from the build step)"
+	echo "install_gcc          ---> Install GCC (follow order)"
 	echo "download_gdb         ---> Downloads and Extracts gdb"
-	echo "build_gdb_build      ---> Builds downloaded gdb and installs binaries"
-	echo "                          into main compiler directory (binutils required)"
+	echo "build_gdb            ---> Builds downloaded gdb and installs binaries"
+	echo "                          into main compiler directory"
 	echo "clean_gdb_build      ---> Removes build directory (from the build step)"
+	echo "install_gdb          ---> Install GDB (follow order)"
+	echo "download_gmp         ---> Downloads and Extracts gmp"
+	echo "build_gmp            ---> Builds downloaded gmp and installs binaries"
+	echo "                          into main compiler directory"
+	echo "clean_gmp_build      ---> Removes build directory (from the build step)"
+	echo "install_gmp          ---> Install GMP (follow order)"
+	echo "download_mpfr        ---> Downloads and Extracts mpfr"
+	echo "build_mpfr           ---> Builds downloaded mpfr and installs binaries"
+	echo "                          into main compiler directory (gmp required)"
+	echo "clean_mpfr_build     ---> Removes build directory (from the build step)"
+	echo "install_mpfr         ---> Install MPFR (follow order)"
+	echo "download_mpc         ---> Downloads and Extracts mpc"
+	echo "build_mpc            ---> Builds downloaded mpc and installs binaries"
+	echo "                          into main compiler directory (gmp required?)"
+	echo "clean_mpc_build      ---> Removes build directory (from the build step)"
+	echo "install_mpc          ---> Install MPC (follow order)"
 
-.PHONY: all_cross_compiler clean_cross_compiler download_binutils build_binutils clean_binutils_build download_gcc build_gcc clean_gcc_build download_gdb build_gdb clean_gdb_build
+# Figlet
+
+install_figlet: download_figlet build_figlet
+
+SOURCE_FIGLET=figlet-2.2.5
+
+download_figlet:
+	echo "Downloading Figlet"
+	curl "http://ftp.figlet.org/pub/figlet/program/unix/$(SOURCE_FIGLET).tar.gz" | tar xvfz - -C $(UTILITY_DIR)
+	echo "Downloading Figlet Fonts"
+	mkdir -p $(UTILITY_DIR)/fonts
+	curl "http://ftp.figlet.org/pub/figlet/fonts/contributed.tar.gz" | tar xvfz - -C $(UTILITY_DIR)/fonts
+	curl "http://ftp.figlet.org/pub/figlet/fonts/international.tar.gz" | tar xvfz - -C $(UTILITY_DIR)/fonts
+
+build_figlet:
+	echo "Building Figlet"
+	cd $(UTILITY_DIR)/$(SOURCE_FIGLET) \
+		&& make \
+			prefix=$(UTILITY_DIR) \
+			CFLAGS=-Wno-implicit-function-declaration \
+			DEFAULTFONTDIR=$(UTILITY_DIR)/fonts \
+			install
+	echo "Figlet (probably) Built Successfully !"
+
+remove_figlet:
+	echo "Purging Figlet Source"
+	rm -rf $(UTILITY_DIR)/$(SOURCE_FIGLET)
+
+.PHONY: all_cross_compiler clean_cross_compiler download_binutils build_binutils clean_binutils_build download_gcc build_gcc clean_gcc_build download_gdb build_gdb clean_gdb_build download_gmp build_gmp clean_gmp_build download_mpfr build_mpfr clean_mpfr_build download_mpc build_mpc clean_mpc_build install_binutils install_gcc install_gdb install_gmp install_mpfr install_mpc
 
