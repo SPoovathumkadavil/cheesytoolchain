@@ -1,3 +1,4 @@
+MAKEFLAGS=-s
 
 MAKEFILE_DIR:=$(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 
@@ -19,7 +20,7 @@ begin_cross_compiler:
 clean_cross_compiler: clean_binutils_build clean_gdb_build clean_gcc_build
 
 all_cross_compiler: begin_cross_compiler download_binutils download_gcc download_gdb build_binutils build_gcc build_gdb clean_cross_compiler
-
+	echo "Cross-Compiler Created (probably) !"
 remove_cross_compiler:
 	echo "Removing Cross-Compiler..."
 	rm -rf $(CROSS_COMPILER_DIR)
@@ -106,4 +107,30 @@ endif
 clean_gcc_build:
 	echo "Purging GCC Build Files"
 	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_GCC)
+
+# -------
+# Utility
+# -------
+
+list:
+	echo "usage: make [any target]"
+	echo "targets:"
+	echo "__cross_compiler__"
+	echo "all_cross_compiler   ---> Download, Build (and install) Binutils, GDB, GCC,"
+	echo "                          then clean build files."
+	echo "clean_cross_compiler ---> Remove all build files from Binutils, GDB, GCC"
+	echo "download_binutils    ---> Downloads and Extracts binutils"
+	echo "build_binutils_build ---> Builds downloaded binutils and installs binaries"
+	echo "                          into main compiler directory"
+	echo "clean_binutils       ---> Removes build directory (from the build step)"
+	echo "download_gcc         ---> Downloads and Extracts gcc"
+	echo "build_gcc_build      ---> Builds downloaded gcc and installs binaries"
+	echo "                          into main compiler directory (binutils required)"
+	echo "clean_gcc            ---> Removes build directory (from the build step)"
+	echo "download_gdb         ---> Downloads and Extracts gdb"
+	echo "build_gdb_build      ---> Builds downloaded gdb and installs binaries"
+	echo "                          into main compiler directory (binutils required)"
+	echo "clean_gdb_build      ---> Removes build directory (from the build step)"
+
+.PHONY: all_cross_compiler clean_cross_compiler download_binutils build_binutils clean_binutils_build download_gcc build_gcc clean_gcc_build download_gdb build_gdb clean_gdb_build
 
