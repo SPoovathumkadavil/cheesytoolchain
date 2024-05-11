@@ -23,7 +23,7 @@ begin_cross_compiler:
 	figlet "Creating Cross-Compiler"
 	mkdir -p $(CROSS_COMPILER_DIR)
 
-strip_cross_compiler: clean_binutils_build clean_gdb_build clean_gcc_build clean_gmp_build clean_mpfr_build clean_mpc_build clean_autoconf_build clean_automake_build clean_texinfo_build clean_libtool_build
+strip_cross_compiler: clean_binutils_build clean_gdb_build clean_gcc_build clean_m4_build clean_gmp_build clean_mpfr_build clean_mpc_build clean_autoconf_build clean_automake_build clean_texinfo_build clean_libtool_build clean_nasm_build
 	echo "Removing Source Files..."
 	echo "(1) Binutils"
 	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_BINUTILS)
@@ -45,9 +45,13 @@ strip_cross_compiler: clean_binutils_build clean_gdb_build clean_gcc_build clean
 	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_LIBTOOL)
 	echo "(10) texinfo"
 	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_TEXINFO)
+	echo "(11) m4"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_M4)
+	echo "(12) nasm"
+	rm -rf $(CROSS_COMPILER_DIR)/$(SOURCE_NASM)
 
 
-all_cross_compiler: begin_cross_compiler install_m4 install_autoconf install_automake install_libtool install_gmp install_mpfr install_mpc install_texinfo install_binutils install_gdb install_gcc
+all_cross_compiler: begin_cross_compiler install_m4 install_autoconf install_automake install_libtool install_gmp install_mpfr install_mpc install_texinfo install_binutils install_gdb install_gcc install_nasm
 	echo "Cross-Compiler Created (probably) !"
 
 remove_cross_compiler:
@@ -299,7 +303,7 @@ build_autoconf:
 
 clean_autoconf_build:
 	echo "Purging autoconf Build"
-	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_LIBTOOL)
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_AUTOCONF)
 
 # automake (dep. autoconf)
 
@@ -349,6 +353,30 @@ clean_texinfo_build:
 	echo "Purging texinfo Build Files"
 	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_TEXINFO)
 
+# NASM
+
+install_nasm: download_nasm build_nasm
+
+SOURCE_NASM=nasm-2.16.03
+
+download_nasm:
+	echo "Downloading NASM"
+	curl "https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/$(SOURCE_NASM).tar.xz" | tar xvJf - -C $(CROSS_COMPILER_DIR)
+
+build_nasm:
+	echo "Building NASM"
+	mkdir -p $(CROSS_COMPILER_DIR)/build-$(SOURCE_NASM)
+	cd $(CROSS_COMPILER_DIR)/build-$(SOURCE_NASM) \
+		&& $(CROSS_COMPILER_DIR)/$(SOURCE_NASM)/configure \
+			--prefix=$(PREFIX) \
+		&& make -j 8 \
+		&& make install
+	echo "NASM (probably) Built Correctly !"
+
+clean_nasm_build:
+	echo "Purging NASM Build Files"
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_NASM)
+
 # -------
 # Utility
 # -------
@@ -366,39 +394,8 @@ list:
 	echo "usage: make [any target]"
 	echo "targets:"
 	echo "__cross_compiler__"
-	echo "all_cross_compiler   ---> Download, Build (and install) Binutils, GDB, GCC,"
-	echo "                          then clean build files."
-	echo "clean_cross_compiler ---> Remove all build files from Binutils, GDB, GCC"
-	echo "download_binutils    ---> Downloads and Extracts binutils"
-	echo "build_binutils       ---> Builds downloaded binutils and installs binaries"
-	echo "                          into main compiler directory"
-	echo "clean_binutils       ---> Removes build directory (from the build step)"
-	echo "install_binutils     ---> Install Binutils (follow order)"
-	echo "download_gcc         ---> Downloads and Extracts gcc"
-	echo "build_gcc            ---> Builds downloaded gcc and installs binaries"
-	echo "                          into main compiler directory (binutils required)"
-	echo "clean_gcc_build      ---> Removes build directory (from the build step)"
-	echo "install_gcc          ---> Install GCC (follow order)"
-	echo "download_gdb         ---> Downloads and Extracts gdb"
-	echo "build_gdb            ---> Builds downloaded gdb and installs binaries"
-	echo "                          into main compiler directory"
-	echo "clean_gdb_build      ---> Removes build directory (from the build step)"
-	echo "install_gdb          ---> Install GDB (follow order)"
-	echo "download_gmp         ---> Downloads and Extracts gmp"
-	echo "build_gmp            ---> Builds downloaded gmp and installs binaries"
-	echo "                          into main compiler directory"
-	echo "clean_gmp_build      ---> Removes build directory (from the build step)"
-	echo "install_gmp          ---> Install GMP (follow order)"
-	echo "download_mpfr        ---> Downloads and Extracts mpfr"
-	echo "build_mpfr           ---> Builds downloaded mpfr and installs binaries"
-	echo "                          into main compiler directory (gmp required)"
-	echo "clean_mpfr_build     ---> Removes build directory (from the build step)"
-	echo "install_mpfr         ---> Install MPFR (follow order)"
-	echo "download_mpc         ---> Downloads and Extracts mpc"
-	echo "build_mpc            ---> Builds downloaded mpc and installs binaries"
-	echo "                          into main compiler directory (gmp required?)"
-	echo "clean_mpc_build      ---> Removes build directory (from the build step)"
-	echo "install_mpc          ---> Install MPC (follow order)"
+	echo "install_dependencies ---> (Re)Make Utility and Cross-Compiler."
+	echo "strip_cross_compiler ---> Remove all cross-compiler source files."
 
 # Figlet
 
@@ -428,5 +425,13 @@ remove_figlet:
 	echo "Purging Figlet Source"
 	rm -rf $(UTILITY_DIR)/$(SOURCE_FIGLET)
 
-.PHONY: all_cross_compiler clean_cross_compiler download_binutils build_binutils clean_binutils_build download_gcc build_gcc clean_gcc_build download_gdb build_gdb clean_gdb_build download_gmp build_gmp clean_gmp_build download_mpfr build_mpfr clean_mpfr_build download_mpc build_mpc clean_mpc_build install_binutils install_gcc install_gdb install_gmp install_mpfr install_mpc
+.PHONY: all_cross_compiler clean_cross_compiler download_binutils
+.PHONY: build_binutils clean_binutils_build download_gcc build_gcc
+.PHONY: clean_gcc_build download_gdb build_gdb clean_gdb_build download_gmp
+.PHONY: build_gmp clean_gmp_build download_mpfr build_mpfr clean_mpfr_build
+.PHONY: download_mpc build_mpc clean_mpc_build download_autoconf build_autoconf
+.PHONY: clean_autoconf_build download_automake build_automake clean_automake_build
+.PHONY: download_libtool build_libtool clean_libtool_build install_binutils install_gcc
+.PHONY: install_gdb install_gmp install_mpfr install_mpc install_figlet
+.PHONY: download_figlet build_figlet remove_figlet list begin_utility all_utility
 
