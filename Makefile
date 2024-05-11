@@ -377,6 +377,88 @@ clean_nasm_build:
 	echo "Purging NASM Build Files"
 	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_NASM)
 
+# mtools
+
+install_mtools: download_mtools build_mtools
+
+SOURCE_MTOOLS=mtools-4.0.43
+
+download_mtools:
+	echo "Downloading mtools"
+	curl "https://ftp.gnu.org/gnu/mtools/$(SOURCE_MTOOLS).tar.gz" | tar xvfz - -C $(CROSS_COMPILER_DIR)
+
+build_mtools:
+	echo "Building mtools"
+	mkdir -p $(CROSS_COMPILER_DIR)/build-$(SOURCE_MTOOLS)
+	cd $(CROSS_COMPILER_DIR)/build-$(SOURCE_MTOOLS) \
+		&& $(CROSS_COMPILER_DIR)/$(SOURCE_MTOOLS)/configure \
+			--prefix=$(PREFIX) \
+			--disable-debug \
+			--without-x \
+		&& make -j 8 \
+		&& make install
+	echo "mtools (probably) Built Successfully !"
+
+clean_mtools_build:
+	echo "Purging mtools Build Files"
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_MTOOLS)
+
+# objconv
+
+install_objconv: download_objconv build_objconv
+
+SOURCE_OBJCONV=objconv
+
+download_objconv:
+	echo "Downloading objconv"
+	mkdir -p $(CROSS_COMPILER_DIR)/$(SOURCE_OBJCONV)
+	cd $(CROSS_COMPILER_DIR)/$(SOURCE_OBJCONV) \
+		&& curl "https://www.agner.org/optimize/objconv.zip" -o $(SOURCE_OBJCONV).zip \
+		&& unzip $(SOURCE_OBJCONV).zip \
+		&& rm $(SOURCE_OBJCONV).zip \
+		&& unzip source.zip
+
+build_objconv:
+	echo "Building objconv"
+	cd $(CROSS_COMPILER_DIR)/$(SOURCE_OBJCONV) \
+		&& sh build.sh \
+		&& mv objconv $(PREFIX)/bin
+	echo "objconv (probably) Built Successfully !"
+
+# grub
+
+install_grub: download_grub build_grub
+
+SOURCE_GRUB=grub
+
+download_grub:
+	echo "Download grub"
+	cd $(CROSS_COMPILER_DIR) \
+		&& git clone --depth 1 git://git.savannah.gnu.org/grub.git
+
+build_grub:
+	echo "Building grub"
+	cd $(CROSS_COMPILER_DIR)/$(SOURCE_GRUB) \
+		&& ./bootstrap
+	mkdir -p $(CROSS_COMPILER_DIR)/build-$(SOURCE_GRUB)
+	cd $(CROSS_COMPILER_DIR)/build-$(SOURCE_GRUB) \
+		&& $(CROSS_COMPILER_DIR)/$(SOURCE_GRUB)/configure \
+			--disable-werror \
+			TARGET_CC=$(TARGET)-gcc \
+			TARGET_OBJCOPY=$(TARGET)-objcopy \
+			TARGET_STRIP=$(TARGET)-strip \
+			TARGET_NM=$(TARGET)-nm \
+			TARGET_RANLIB=$(TARGET)-ranlib \
+			--target=$(TARGET) \
+			--prefix=$(PREFIX)
+		&& make -j 8 \
+		&& make install
+	echo "grub (probably) Built Successfully"
+
+clean_grub_build:
+	echo "Purging grub Build Files"
+	rm -rf $(CROSS_COMPILER_DIR)/build-$(SOURCE_GRUB)
+
 # -------
 # Utility
 # -------
